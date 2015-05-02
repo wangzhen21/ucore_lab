@@ -1,0 +1,4 @@
+file bin/kernel
+target remote :1234
+b *0x7c00
+c
