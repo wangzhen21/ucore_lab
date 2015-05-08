@@ -1,0 +1,107 @@
+#lab6 Report
+计21  王振 2012011397
+## [练习0] 填写已有实验
+> * alloc_proc() in proc.c
+```
+proc->rq = NULL;
+proc->run_link.prev = proc->run_link.next = NULL;
+proc->time_slice = 0;
+proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
+proc->lab6_stride = 0;
+proc->lab6_priority = 0;	
+```
+> * trap_dispatch() in trap.c
+```
+ticks ++;
+sched_class_proc_tick(current);	
+```
+## [练习1] 使用 Round Robin 调度算法
+请理解并分析sched_calss中各个函数指针的用法，并接合Round Robin 调度算法描ucore的调度执行过程
+> 函数指针用来实现加载不同的调度函数，从而可以使用不同的调度算法。其中，函数指针的初始化在default_sched.c中实现：
+`思考题1.1:   
+   init：初始化正在运行的队列
+   enqueue：将正在运行队列加入一个进程
+   dequeue：将正在运行队列中的一个进程取出
+   pick_next：选择队列中的stride参数最小的一个进程 
+   proc_tick：每个时钟中断时调用，表示一个进程时间片完成，操作进程剩余时间片
+
+> * ucore的调度执行过程如下
+	```
+	1 维护一个就绪队列rq，需要调度时执行schedule函数
+		2 将当前进程插入队列
+	3 选择stride最小的作为next
+	4 将next从队列取出
+	5 变换当前执行的进程至next
+ 2.	<b>说明如何设计实现“多级反馈队列调度算法”</b>
+	
+	> * 维护多个队列，每个队列的优先级不同，MAX_TIME_SLICE不同。
+	> * 对不同队列中的进程按次序进行调用
+	> * 对不同队列中的prioity设置为不同的值，运行时长不同
+
+## [练习2] 完成stride算法的实现
+>定义一个最大步长数,此处取32位有符号整数中的最大值
+#define BIG_STRIDE   0x7FFFFFFF
+
+调度器接口实现如下：
+```
+init:
+
+– 初始化当前的运行队。（比如和RR调度算法一样，初始化为一个有序列表）
+
+enqueue
+– 将 proc插入放入运行队列中去。
+
+dequeue
+– 从运行队列中删除相应的元素。
+
+pick next
+– 选择队列中的stride参数最小的一个进程,更新对应进程的stride值.	
+
+proc tick:
+– 如果时间片用完，应该正确设置进程结构的相关标记来引起进程切换。一个 process 最多可以连续运行 rq.max_time_slice个时间片。
+```
+> stride_init() 初始化函数
+```
+list_init(&(rq->run_list));
+rq->lab6_run_pool = NULL;
+rq->proc_num = 0;
+```
+>stride_enqueue() 入队列函数（使用基于斜堆的优先队列）
+```
+rq->lab6_run_pool = skew_heap_insert(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+if (proc->time_slice == 0 || proc->time_slice > rq->max_time_slice) {
+    proc->time_slice = rq->max_time_slice;
+ }
+    proc->rq = rq;
+    rq->proc_num ++;
+```
+>stride_dequeue() 出队列函数（使用基于斜堆的优先队列）
+```
+rq->lab6_run_pool =skew_heap_remove(rq->lab6_run_pool, &(proc->lab6_run_pool), proc_stride_comp_f);
+    rq->proc_num --;
+	```
+>stride_pick_next() 选择下一个运行的进程（使用基于斜堆的优先队列）
+```
+if (rq->lab6_run_pool == NULL) return NULL;
+    struct proc_struct *p = le2proc(rq->lab6_run_pool, lab6_run_pool);
+    if (p->lab6_priority == 0)
+       	p->lab6_stride += BIG_STRIDE;
+    else p->lab6_stride += BIG_STRIDE / p->lab6_priority;
+    	return p;
+```
+> * stride_proc_tick() 产生时钟中断
+```
+if (proc->time_slice > 0) {
+       	proc->time_slice --;
+    }
+    if (proc->time_slice == 0) {
+       	proc->need_resched = 1;
+    }
+## 实验分析
+> 参照注释以及答案,lab6_result显示的是相同的结果1,2,3,3,4.。
+
+## OS原理知识
+> 重要的知识点: Round Robin算法，Stride Scheduling算法。  
+
+## 列出你认为OS原理中很重要，但在实验中没有对应上的知识点
+> OS原理中多级反馈队列算法，公平共享调度等，这些实验里都无法全部涵盖。
