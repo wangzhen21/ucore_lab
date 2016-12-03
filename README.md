@@ -1,4 +1,4 @@
-dsafadsffdfdsa# 介绍(2015)
+发的发的dsafadsffdfdsa# 介绍(2015)
 
 uCore OS Labs是用于清华大学计算机系本科操作系统课程的教学试验内容。
 
